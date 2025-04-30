@@ -1,180 +1,170 @@
-from model.inference import forward
-from utils.evaluate import snr
-from data.transforms import to_log
-from utils.io import get_data, remove_lightning_console_log
-from utils.args import parse_args_inference
-from utils.util_model import get_DNNs, load_net
-from utils.util_model import create_net_inference as create_net
-from utils.misc import vprint
-from utils.data import normalize_instance, normalize
-from utils.op_R2D2Net import gen_op_R2D2Net
-
-import timeit
-import torch
+import argparse
 import os
+
+import torch
 import numpy as np
-import multiprocessing as mp
 from astropy.io import fits
 
+from lib import gen_imaging_weights
+from optimiser import R2D2
+from utils import load_data_to_tensor, parse_args_imaging, vprint, create_meas_op, snr, to_log
+
+
 if __name__ == "__main__":
-    remove_lightning_console_log()
-    # parser and prepare arguments for imaging
-    args = parse_args_inference()
-    filename = str(args.data_file).split('/')[-1].split('.mat')[0].split('.fits')[0]
-    total_num_iter = args.num_iter
-    save_output = args.save_all_outputs
-    print(args)
-    compute_metrics = False if args.gdth_file is None else True
-    print(compute_metrics)
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    res_device = device if args.res_on_gpu else torch.device('cpu')
-    
-    # create a pool of workers for residual computation
-    if not args.res_on_gpu and args.operator_type == 'table':
-        pool = mp.Pool(processes=args.cpus)
-    else:
-        pool = None
-    vprint(f'INFO: Using {device} for DNN inference and {res_device} for residual computation.', args.verbose, 1)
-    results_save = 'all iterations' if args.save_all_outputs else 'final iteration'
-    vprint(f'INFO: Results from {results_save} will be saved in {args.output_path}.', args.verbose, 1)
+    parser = argparse.ArgumentParser(description="R2D2 image reconstruction.")
+    args = parse_args_imaging()
+    data = load_data_to_tensor(
+        uv_file_path=args.data_file,
+        super_resolution=args.super_resolution,
+        image_pixel_size=args.image_pixel_size,
+        data_weighting=True,
+        dtype=args.meas_dtype,
+        device=args.device,
+        verbose=args.verbose,
+    )
 
-    # initialise dictionary to store timing information
-    timing = {f'N{i+1}': {'DNN inference time': None, 'Residual dirty image computation time': None} for i in range(total_num_iter)}
-    # initialise dictionary to store reconstruction and residual dirty images
-    if args.save_all_outputs:
-        rec_dict = {f'N{i+1}': None for i in range(total_num_iter)}
-        res_dict = {f'N{i+1}': None for i in range(total_num_iter)}
-    else:
-        rec_dict = {f'N{total_num_iter}': None}
-        res_dict = {f'N{total_num_iter}': None}
-        
-    # get DNN weights and create DNN without loading weights
-    dnns_dict = get_DNNs(args.num_iter, args.ckpt_path, device)
-    net = create_net(args, device)
-    
-    # obtain data from args.data_file and generate starting residual dirty image and measurement operator(s)
-    data, op, dirty_time = get_data(args, device, res_device, filename)
-    
-    if args.layers > 1:
-        # create PSF with 2x FOV
-        time_PSF = timeit.default_timer()
-        data['PSF_2x_img_size'] = op.gen_PSF(oversampling=2, normalize=True)
-        print(f'INFO: time to compute the PSF needed in R2D2-Net: {timeit.default_timer() - time_PSF:.6f} sec')
-        fits.writeto(os.path.join(args.output_path, 'psf_2x_img_size.fits'), data['PSF_2x_img_size'].clone().squeeze().numpy(force=True), overwrite=True)
-        # create operator for DC layer inside R2D2Net
-        op_R2D2Net = gen_op_R2D2Net(op.im_size, 
-                                    data,
-                                    device)
-    else:
-        op_R2D2Net = None
-        
-    fits.writeto(os.path.join(args.output_path, 'dirty.fits'), data['dirty'].clone().squeeze().numpy(force=True), overwrite=True)
-    fits.writeto(os.path.join(args.output_path, 'psf.fits'), data['psf'].clone().squeeze().numpy(force=True), overwrite=True)
-    
-    # normalize dirty image and ground truth by mean of dirty image
-    data['dirty_n'], data['mean'] = normalize_instance(data['dirty'], eps=1e-110)
-    data['gdth_n'] = normalize(data['gdth'], data['mean'], eps=1e-110)
-    
-    dirty_norm = np.linalg.norm(data['dirty'].clone().squeeze().numpy(force=True))
-    
-    output = torch.zeros_like(data['dirty']).to(device)
-    output_n = torch.zeros_like(data['dirty']).to(device)
-    res_n = data['dirty_n']
-    
-    ################################################################################################
-    print('-' * 10)
-    print(f'{args.series} algorithm starts ...')
-    start_imaging = timeit.default_timer()
-    for i in range(args.num_iter):
-        vprint(f'Iteration {i+1} ...', args.verbose, 1)
-        start_dnn = timeit.default_timer()
-        # load network weights from cpu to gpu
-        net = load_net(net, i+1, args, dnns_dict)
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-        with torch.no_grad():
-            output = forward(args, i, net, res_n, output_n, data, op_R2D2Net, device)
-        dnn_time = timeit.default_timer() - start_dnn
-        vprint(f'INFO: DNN inference & model update time: {dnn_time:.6f} sec', args.verbose, 1)
-        torch.cuda.empty_cache() 
-        timing[f'N{i+1}']['DNN inference time'] = dnn_time
-        start_res = timeit.default_timer()
-        # generate residual dirty image
-        if args.res_on_gpu or args.operator_type != 'table':
-            res = op.gen_res(data['dirty'], output)
+    vprint("Generating imaging weights ...", args.verbose)
+    vprint(f"INFO: weight type: {args.weight_type}", args.verbose)
+    if args.weight_type == "briggs":
+        if "weight_robustness" in data:
+            weight_robustness = data["weight_robustness"].item()
+            vprint(f"INFO: weight robustness found in data file.", args.verbose)
         else:
-            res = pool.apply(op.gen_res, (data['dirty'], output))
-        res_time = timeit.default_timer() - start_res
-        vprint(f'INFO: residual dirty image computation time: {res_time:.6f} sec', args.verbose, 1)
-        
-        timing[f'N{i+1}']['Residual dirty image computation time'] = res_time
-        if save_output or (i == (total_num_iter-1)):
-            rec_dict[f'N{i+1}'] = output
-            res_dict[f'N{i+1}'] = res
-        # Normalization for next iteration
-        output_n, data['mean'] = normalize_instance(output, eps=1e-110)
-        res_n = normalize(res, data['mean'], eps=1e-110)
-        vprint('', args.verbose, 1)
-    if pool is not None:
-        pool.close()
-    imaging_time = timeit.default_timer() - start_imaging
-    ################################################################################################
-    print(f'{args.series} algorithm finished.')
-    print('-' * 10)
-    # report timing
-    model_update_time_total = sum([timing[f"N{i+1}"]["DNN inference time"] for i in range(args.num_iter)])
-    model_update_time_avg = model_update_time_total / args.num_iter
-    res_time_total = sum([timing[f"N{i+1}"]["Residual dirty image computation time"] for i in range(args.num_iter)])
-    res_time_avg = res_time_total / args.num_iter
-    imaging_time = model_update_time_total + res_time_total
-    
-    vprint('** Timings:', args.verbose, 1)
-    print(f'** Total imaging time: {imaging_time:.6f} sec')
-    vprint(f'** Total DNN inference & model update time: {model_update_time_total:.6f} sec', args.verbose, 1)
-    vprint(f'** Total residual dirty image computation time: {res_time_total:.6f} sec', args.verbose, 1)
-    vprint(f'** Average DNN inference & model update time: {model_update_time_avg:.6f} sec', args.verbose, 1)
-    vprint(f'** Average residual dirty image computation time: {res_time_avg:.6f} sec', args.verbose, 1)
-    
-    # save reconstruction and residual dirty images
-    if args.save_all_outputs:
-        for i in range(args.num_iter-1):
-            if args.layers == 1:
-                fits.writeto(os.path.join(args.output_path, f'R2D2_N{i+1}_model_image.fits'),
-                             rec_dict[f'N{i+1}'].clone().squeeze().detach().cpu().numpy(), overwrite=True)
-                fits.writeto(os.path.join(args.output_path, f'R2D2_N{i+1}_normalised_residual_dirty_image.fits'),
-                             res_dict[f'N{i+1}'].clone().squeeze().detach().cpu().numpy(), overwrite=True)
-            else:
-                fits.writeto(os.path.join(args.output_path, f'R3D3_{args.layers}L_N{i+1}_model_image.fits'),
-                             rec_dict[f'N{i + 1}'].clone().squeeze().detach().cpu().numpy(), overwrite=True)
-                fits.writeto(os.path.join(args.output_path, f'R3D3_{args.layers}L_N{i+1}_normalised_residual_dirty_image.fits'),
-                             res_dict[f'N{i + 1}'].clone().squeeze().detach().cpu().numpy(), overwrite=True)
-    if args.layers == 1:
-        fits.writeto(os.path.join(args.output_path, 'R2D2_model_image.fits'),
-                     rec_dict[f'N{total_num_iter}'].clone().squeeze().detach().cpu().numpy(), overwrite=True)
-        fits.writeto(os.path.join(args.output_path, 'R2D2_normalised_residual_dirty_image.fits'),
-                     res_dict[f'N{total_num_iter}'].clone().squeeze().detach().cpu().numpy(), overwrite=True)
+            weight_robustness = args.weight_robustness
+        vprint(f"INFO: weight robustness: {weight_robustness}", args.verbose)
     else:
-        fits.writeto(os.path.join(args.output_path, f'R3D3_{args.layers}L_model_image.fits'),
-                     rec_dict[f'N{total_num_iter}'].clone().squeeze().detach().cpu().numpy(), overwrite=True)
-        fits.writeto(os.path.join(args.output_path, f'R3D3_{args.layers}L_normalised_residual_dirty_image.fits'),
-                     res_dict[f'N{total_num_iter}'].clone().squeeze().detach().cpu().numpy(), overwrite=True)
+        weight_robustness = None
+    vprint(f"INFO: computing imaging weights ...", args.verbose)
+    data["nWimag"] = (
+        gen_imaging_weights(
+            data["u"].clone(),
+            data["v"].clone(),
+            data["nW"],
+            args.img_size,
+            args.weight_type,
+            args.weight_gridsize,
+            torch.tensor(weight_robustness).to(args.device),
+        )
+        .to(args.device)
+        .view(1, 1, -1)
+    ).to(torch.complex128 if args.meas_dtype == torch.float64 else torch.complex64)
 
+    meas_op = create_meas_op(args=args, data=data, device=args.device)
 
-    print('-' * 10)
-    print('** Evaluation metrics')
-    # compute and report metrics
-    if compute_metrics:
-        SNR = snr(data['gdth'].squeeze().numpy(force=True), output.squeeze().numpy(force=True))
-        if args.target_dynamic_range not in [None, 0.]:
-            logSNR = snr(to_log(data['gdth'],args.target_dynamic_range).squeeze().numpy(force=True), 
-                         to_log(output,args.target_dynamic_range).squeeze().numpy(force=True))
-            print(f'** SNR: {SNR:.6f} dB, logSNR: {logSNR:.6f} dB')
-        else:
-            print(f'** SNR: {SNR:.6f} dB')
-    sigma_res = np.linalg.norm(res.squeeze().numpy(force=True)) / dirty_norm
-    res_std = np.std(res.squeeze().numpy(force=True))
-    print(f'** Data fidelity: standard deviation of the residual dirty image: {res_std:.6f}')
-    print(f'** Data fidelity: ||residual|| / ||dirty||: {sigma_res:.6f}')
-    print('-' * 10)
-    
-    print('THE END.')
+    if args.target_dynamic_range is None and "sigma" not in data:
+        target_dynamic_range = np.sqrt(2 * meas_op.get_op_norm())
+        vprint(
+            f"Estimating target dynamic range as the reciprocal of the heuristic 1/sqrt(2L) = {target_dynamic_range:4e}",
+            args.verbose,
+        )
+    elif args.target_dynamic_range is None:
+        target_dynamic_range = 1 / data["sigma"].item() if "sigma" in data else args.target_dynamic_range
+    else:
+        target_dynamic_range = args.target_dynamic_range
+
+    if not args.src_name:
+        args.src_name = os.path.basename(args.data_file).split(".mat")[0]
+    save_pth_main = os.path.join(args.output_path, args.src_name)
+    os.makedirs(save_pth_main, exist_ok=True)
+
+    if args.layers > 1 or args.data_init:
+        meas_op2 = create_meas_op(args=args, data=data, os=2, device=args.device)
+    else:
+        meas_op2 = None
+
+    if args.ckpt_realisations == 1:
+        optimiser = R2D2(
+            meas=data["y"] * data["nW"] * data["nWimag"],
+            meas_op=meas_op,
+            ckpt_path=args.ckpt_path,
+            layers=args.layers,
+            num_iter=args.num_iter,
+            meas_op2=meas_op2,
+            save_pth=save_pth_main,
+            save_all_outputs=args.save_all_outputs,
+            gdth_file=args.gdth_file,
+            target_dynamic_range=target_dynamic_range,
+            architecture=args.architecture,
+            num_chans=args.num_chans,
+            prune=args.prune,
+            sigma_res_tol=args.sigma_res_tol,
+            input_order=args.input_order,
+            device=args.device,
+            verbose=args.verbose,
+        )
+
+        optimiser.initialisation()
+        optimiser.run()
+        optimiser.finalisation()
+
+    elif args.ckpt_realisations > 1:
+        for i in range(args.ckpt_realisations):
+            assert os.path.exists(
+                os.path.join(args.ckpt_path, f"V{i+1}")
+            ), f"Checkpoint path not found: {os.path.join(args.ckpt_path, f'V{i+1}')}"
+
+        vprint(
+            f"{args.ckpt_realisations} realisations of R2D2 series specified, epistemic uncertainty quantification will also be computed.",
+            args.verbose,
+        )
+        for i in range(args.ckpt_realisations):
+            vprint("", args.verbose)
+            vprint("=" * 50, args.verbose)
+            vprint(f"Realisation {i+1}/{args.ckpt_realisations}:", args.verbose)
+            save_pth = os.path.join(save_pth_main, f"V{i+1}")
+            os.makedirs(save_pth, exist_ok=True)
+            ckpt_path = os.path.join(args.ckpt_path, f"V{i+1}")
+            optimiser = R2D2(
+                meas=data["y"] * data["nW"] * data["nWimag"],
+                meas_op=meas_op,
+                ckpt_path=ckpt_path,
+                layers=args.layers,
+                num_iter=args.num_iter,
+                meas_op2=meas_op2,
+                save_pth=save_pth,
+                save_all_outputs=args.save_all_outputs,
+                gdth_file=args.gdth_file,
+                target_dynamic_range=target_dynamic_range,
+                architecture=args.architecture,
+                num_chans=args.num_chans,
+                prune=args.prune,
+                sigma_res_tol=args.sigma_res_tol,
+                input_order=args.input_order,
+                device=args.device,
+                verbose=args.verbose,
+            )
+
+            optimiser.initialisation()
+            optimiser.run()
+            optimiser.finalisation()
+
+        rec = np.zeros((args.ckpt_realisations, *args.img_size))
+        for i in range(args.ckpt_realisations):
+            rec[i] = fits.getdata(os.path.join(save_pth_main, f"V{i+1}", "R2D2_model_image.fits"))
+        rec_mean = rec.mean(axis=0)
+        rec_std = rec.std(axis=0)
+
+        mask = rec_mean > (1 / target_dynamic_range)
+        std_over_avg = np.zeros(args.img_size)
+        std_over_avg[mask] = rec_std[mask] / rec_mean[mask]
+        MRU = std_over_avg.mean()
+        std_over_avg[std_over_avg == 0] = np.nan
+        fits.writeto(
+            os.path.join(save_pth_main, "R2D2_std_over_mean_image.fits"),
+            std_over_avg.squeeze(),
+            overwrite=True,
+        )
+        fits.writeto(
+            os.path.join(save_pth_main, "R2D2_mean_model_image.fits"),
+            rec_mean.squeeze(),
+            overwrite=True,
+        )
+        if args.gdth_file is not None:
+            gdth = fits.getdata(args.gdth_file)
+            snr_tmp = snr(gdth, rec_mean, 1e-110)
+            vprint(f"Computing metrics with the model image averaged over the {args.ckpt_realisations} realisations.", args.verbose)
+            vprint(f"SNR: {snr_tmp:.4f} dB", args.verbose)
+            if target_dynamic_range is not None:
+                log_snr_tmp = snr(to_log(gdth, target_dynamic_range), to_log(rec_mean, target_dynamic_range), 1e-110)
+                vprint(f"logSNR: {log_snr_tmp:.4f} dB", args.verbose)
+        vprint(f"MRU: {MRU:.4e}", args.verbose)

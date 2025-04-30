@@ -1,0 +1,4 @@
+[submodule "src/lib/RI-measurement-operator"]
+	path = src/lib/RI-measurement-operator
+	url = https://github.com/basp-group/RI-measurement-operator.git
+	branch = python

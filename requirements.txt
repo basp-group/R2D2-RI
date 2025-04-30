@@ -1,8 +1,14 @@
 astropy==6.0.0
 lightning==2.2.0
-tensorboard
+torch>=2.0.0
+tensorboard==2.16.1
 torchkbnufft==1.4.0
 torchmetrics==0.7.0
 tqdm==4.66.2
-pydantic==2.7.1
-matplotlib
+pydantic==2.7.0
+matplotlib>=3.8.3
+finufft>=2.3.0
+pytorch_finufft>=0.1.0
+psutil>=5.9.6
+h5py>=3.11.0
+ipykernel==6.29.5

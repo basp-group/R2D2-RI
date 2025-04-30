@@ -70,8 +70,10 @@ def normalize_instance(data, eps=0.):
     # elif 'cupy' in str(type(data)):
     #     import cupy as cp
     #     mean = cp.mean(data)
+        # mean = np.abs(mean) 
     elif 'torch' in str(type(data)):
         mean = data.mean(dim=(-1, -2), keepdim=True)
+        # mean = torch.abs(mean)
     return normalize(data, mean, eps), mean
 
 class DataTransform_N1:

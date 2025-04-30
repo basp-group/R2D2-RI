@@ -5,8 +5,7 @@ import timeit
 from data import transforms as T
 from data.transforms import DataTransform_N1, DataTransform_Ni
 from model.model import Model
-from utils.util_model import create_net
-from lib.operator import operator
+from utils import operator, create_net
 
 class R2D2_model(Model):
     def __init__(self, hparams):
@@ -26,7 +25,10 @@ class R2D2_model(Model):
                 
         
     def forward(self, batch, stage):
-        _, _, target, _, _, fname, slice, _, a_expo = batch
+        if self.hparams.num_iter == 1:
+            _, _, target, _, _, fname, slice, _, a_expo = batch
+        else:
+            _, _, target, _, _, _, _, fname, slice, _, a_expo = batch
         output, time, loss = self.compute_forward(batch)
         if self.hparams.mode == 'test':
             print(f'{fname[0]}: Time: {time:.4f}')

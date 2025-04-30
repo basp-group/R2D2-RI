@@ -1,0 +1,28 @@
+# i/o
+gdth_file: ./data/3c353_gdth.fits
+output_path: ./results/
+data_file: ./data/data_3c353.mat
+save_all_outputs: False
+architecture: uwdsr
+prune: True
+sigma_res_tol: 1e-4
+
+# measurement operator
+meas_op_on_gpu: True
+meas_dtype: double
+im_dim_x: 512
+im_dim_y: 512
+
+# weighting
+data_weighting: True
+natural_weight: True
+weight_type: briggs
+
+# algo
+num_iter: 25
+num_chans: 32
+series: R2D2
+layers: 1
+ckpt_path: ./ckpt/R2D2_A2/
+ckpt_realisations: 5
+

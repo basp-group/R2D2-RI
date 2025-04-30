@@ -1,126 +1,190 @@
 # R2D2 Algorithm
+
 ![language](https://img.shields.io/badge/language-python-orange.svg)
 [![license](https://img.shields.io/badge/license-GPL--3.0-brightgreen.svg)](LICENSE)
 
 - [R2D2 Algorithm](#r2d2-algorithm)
   - [Description](#description)
   - [Dependencies](#dependencies)
-  - [Imaging](#imaging)
-    - [Input files](#input-files)
-      - [Trained DNN series](#trained-dnn-series)
-      - [Data (measurement) file](#data-measurement-file)
-      - [Groundtruth file](#groundtruth-file)
-    - [Usage and example](#usage-and-example)
-  - [Training](#training)
+    - [Cloning the project](#cloning-the-project)
+    - [Python packages](#python-packages)
+    - [NUFFT packages](#nufft-packages)
+  - [Input files](#input-files)
+    - [VLA-trained DNN series](#vla-trained-dnn-series)
+    - [Data (measurement) file](#data-measurement-file)
+    - [Groundtruth file](#groundtruth-file)
+  - [Usage and Example](#usage-and-example)
+    - [Imaging / Test stage](#imaging--test-stage)
+    - [Training](#training)
 
 ## Description
-The R2D2 algorithm takes a hybrid structure between a Plug-and-Play (PnP) algorithm and a learned version of the well-known Matching Pursuit algorithm. Its reconstruction is formed as a series of residual images, iteratively estimated as outputs of iteration-specific Deep Neural Networks (DNNs), each taking the previous iteration’s image estimate and associated back-projected data residual as inputs.  The R2D2 algorithm comes in two incarnations. The first uses the well-known U-Net architecture for
-its DNNs, and is simply referred to as R2D2. The second uses a more advanced architecture dubbed R2D2-Net, obtained by unrolling the R2D2 algorithm itself. In reference to its nesting structure, this incarnation is referred to as R3D3. The primary application of the R2D2 algorithm is to solve large-scale high-resolution high-dynamic range inverse problems in radio astronomy, more specifically 2D planar monochromatic intensity imaging.
 
+The R2D2 algorithm takes a hybrid structure between a Plug-and-Play (PnP) algorithm and a learned version of the well-known "Matching Pursuit" algorithm. Its reconstruction is formed as a series of residual images, iteratively estimated as outputs of Deep Neural Networks (DNNs) taking the previous iteration’s image estimate and associated data residual as inputs. R2D2's primary application is to solve large-scale, high-resolution, high-dynamic range inverse problems for RI in radio astronomy, more specifically, 2D planar monochromatic intensity imaging. This repository corresponds to the latest version of the R2D2 algorithm (v2.0). Earlier versions (v1.0, both MATLAB and Python) are available as separate branches.
 Please refer to the following papers:
 
->[1] Aghabiglou, A., Chu, C. S., Dabbech, A. & Wiaux, Y., The R2D2 deep neural network series paradigm for fast precision imaging in radio astronomy, ApJS, 273(1):3, 2024, [arXiv:2403.05452](https://arxiv.org/abs/2403.05452) | [DOI:10.3847/1538-4365/ad46f5](https://doi.org/10.3847/1538-4365/ad46f5)
+<!-- [arXiv:2403.05452](https://arxiv.org/abs/2403.05452) -->
+> [1] Aghabiglou, A., Chu, C. S., Tang, C., Dabbech, A. & Wiaux, Y., Towards a robust R2D2 paradigm for radio-interferometric imaging: revisiting DNN training and architecture, submitted to ApJS, [arXiv:2503.02554](https://arxiv.org/abs/2503.02554)
 >
->[2] Dabbech, A., Aghabiglou, A., Chu, C. S. & Wiaux, Y., CLEANing Cygnus A deep and fast with R2D2, ApJL, 966(2), L34, 2024, [arXiv:2309.03291](https://arxiv.org/abs/2309.03291) | [DOI:10.3847/2041-8213/ad41df](https://doi.org/10.3847/2041-8213/ad41df)
+> [2] Aghabiglou, A., Chu, C. S., Dabbech, A. & Wiaux, Y., R2D2 image reconstruction with model uncertainty quantification in radio astronomy, EUSIPCO, 2024, [arXiv:2403.18052](https://arxiv.org/abs/2403.18052) | [DOI:10.23919/EUSIPCO63174.2024.10715010](https://doi.org/10.23919/EUSIPCO63174.2024.10715010)
 >
+> [3] Aghabiglou, A., Chu, C. S., Dabbech, A. & Wiaux, Y., The R2D2 deep neural network series paradigm for fast precision imaging in radio astronomy, ApJS, 273(1), 3, 2024, [arXiv:2403.05452](https://arxiv.org/abs/2403.05452) | [DOI:10.3847/1538-4365/ad46f5](https://doi.org/10.3847/1538-4365/ad46f5)
+>
+> [4] Dabbech, A., Aghabiglou, A., Chu, C. S. & Wiaux, Y., CLEANing Cygnus A deep and fast with R2D2, ApJL, 966(2), L34, 2024, [arXiv:2309.03291](https://arxiv.org/abs/2309.03291) | [DOI:10.3847/2041-8213/ad41df](https://doi.org/10.3847/2041-8213/ad41df)
 
-This repository provides a full Python implementation of the R2D2 algorithm (in its two incarnations) at both training and imaging stages. 
-
-The full path to this repository is referred to as `$R2D2` in the rest of the documentation.
-
-A MATLAB implementation of the R2D2 algorithm (imaging only) is available in the branch [`matlab-inference`](https://github.com/basp-group/R2D2/tree/matlab-inference).
-
-We also provide a tutorial in the format of [Jupyter notebook](https://github.com/basp-group/R2D2-SII/blob/main/tutorial_r2d2_python.ipynb) as a quick start guide about how to run the scripts in this repository, from setting up the environment to imaging RI measurements. It can also be viewed online [here](https://basp-group.github.io/BASPLib/R2D2_tutorial.html).
+This repository provides a full Python implementation of the R2D2 algorithm at both training and imaging stages.
 
 ## Dependencies
-Python version `3.10` or higher is required. PyTorch and torchvision should be installed separately by following the instructions from the [website](https://pytorch.org/get-started/locally/) to ensure their latest version available for your CUDA version is installed. For CUDA versions older than 11.8, follow the instructions from the [website](https://pytorch.org/get-started/previous-versions/). Below is an example of the command used to install PyTorch with CUDA version 11.6:
-```
-pip install torch==1.13.1+cu116 torchvision==0.14.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
-```
-Other required Python packages are listed in the file [`$R2D2/requirements.txt`](requirements.txt), and can be easily installed using the command below:
-   ``` bash
-   pip install -r requirements.txt
-   ```
-## Imaging
 
-### Input files
-Both R2D2 and R3D3 series are trained to form images of size `512x512` from data acquired by the Very Large Array (VLA). The input dirty images (i.e., the back-projected data) are expected to have a pixel size corresponding to a super resolution factor of `1.5`, and to be obtained using the data-weighting scheme Briggs. To run the R2D2 algorithm, data and DNN files are required.
+### Cloning the project
 
-#### Trained DNN series 
-The VLA-trained R2D2 and R3D3 DNN series are available at the DOI:[10.17861/99cbe654-5071-4625-b59d-a26c790cbeb4](https://researchportal.hw.ac.uk/en/datasets/r2d2-deep-neural-network-series-for-radio-interferometric-imaging). DNN checkpoints must to be saved in a desired path `$CHECKPOINT_DIR` and under the following filename convention.  
-- For R2D2, the checkpoints of its `$I` U-Net components are structured inside `$CHECKPOINT_DIR` as follows:
-  ```Python
+Clone the repository with the required submodule using one of the commands below:
+
+- using a password-protected SSH key:
+
+  ```bash
+  git clone --recurse-submodules git@github.com:basp-group/R2D2-RI.git
+  ```
+
+- using the web URL:
+
+  ```bash
+  git clone --recurse-submodules https://github.com/basp-group/R2D2-RI.git
+  ```
+
+### Python packages
+
+All required Python packages are listed in the [requirements](requirements.txt) file. Python version `3.10` or higher is required.
+
+Install the packages using the command below:
+
+```bash
+pip install -r requirements.txt
+```
+
+### NUFFT packages
+
+The data fidelity layers are computed using the Non-Uniform Fast Fourier Transform (NUFFT) operator, which is implemented in the python branch of the submodule [RI-measurement-operator](https://github.com/basp-group/RI-measurement-operator/tree/python). The default NUFFT package used is [pytorch-finufft](https://flatironinstitute.github.io/pytorch-finufft/), which is included in the [requirements](requirements.txt) file. If GPU with cuda driver is available, an additional package is required for `pytorch-finufft` to be able to utilise the GPU, using the command:
+
+```bash
+pip install cufinufft
+```
+
+PyNUFFT and TorchKbNUFFT are optionally available, which can be installed using the following commands:
+
+- [PyNUFFT](https://pynufft.readthedocs.io/en/latest/).
+
+```bash
+pip install pynufft
+```
+
+- [TorchKbNufft](https://torchkbnufft.readthedocs.io/en/stable/).
+
+```bash
+pip install torchkbnufft
+```
+
+## Input files
+
+The available R2D2 series are trained specifically for images of size `512x512`. To run the R2D2 algorithm, data and DNN files are required.
+
+### VLA-trained DNN series
+
+- The VLA-trained R2D2 (U-Net & U-WDSR) DNN series proposed in [1] are available at the DOI:[10.17861/e3060b95-4fe6-4b61-9f72-d77653c305bb](https://researchportal.hw.ac.uk/en/datasets/robust-r2d2-dnn-series-for-monochromatic-intensity-imaging-with-v). The series support varying pixel-resolutions, corresponding to super resolution factors in the interval [1.5, 2.5]. They also support the Briggs data-weighting scheme with varying robustness parameter in the interval [-1, 1]. Five realisations of both series are trained to enable epistemic uncertainty quantification.
+
+DNN checkpoints need to be saved in a desired path `$CHECKPOINT_DIR`.
+
+- For R2D2 with U-Net as a core architecture, the DNN checkpoints are structured inside `$CHECKPOINT_DIR` as follows:
+
+  ```bash
   $CHECKPOINT_DIR'/R2D2_UNet_N1.ckpt'
   $CHECKPOINT_DIR'/R2D2_UNet_N2.ckpt'
   ..
   $CHECKPOINT_DIR'/R2D2_UNet_N'$I'.ckpt'
   ```
-  
-- For R3D3, the checkpoints of its `$I` R2D2-Net components (each composed of `$J` U-Net layers) are structured inside `$CHECKPOINT_DIR` as follows:
-  ```Python
-   $CHECKPOINT_DIR'/R3D3_R2D2Net_'$J'Layers_N1.ckpt'
-   $CHECKPOINT_DIR'/R3D3_R2D2Net_'$J'Layers_N2.ckpt'
-   ..
-   $CHECKPOINT_DIR'/R3D3_R2D2Net_'$J'Layers_N'$I'.ckpt'
+
+- For R2D2 with U-WDSR as a core architecture, the DNN checkpoints are structured inside `$CHECKPOINT_DIR` as follows:
+
+  ```bash
+  $CHECKPOINT_DIR'/R2D2_UWDSR_N1.ckpt'
+  $CHECKPOINT_DIR'/R2D2_UWDSR_N2.ckpt'
+  ..
+  $CHECKPOINT_DIR'/R2D2_UWDSR_N'$I'.ckpt'
   ```
-#### Data (measurement) file
-The current code takes as input data a measurement file in ``.mat`` format containing the following fields:
 
- ```Matlab 
-   "y"               %% vector; data (Stokes I)
-   "u"               %% vector; u coordinate (in units of the wavelength)
-   "v"               %% vector; v coordinate (in units of the wavelength)
-   "w"               %% vector; w coordinate (in units of the wavelength)
-   "nW"              %% vector; inverse of the noise standard deviation 
-   "nWimag"          %% vector; square root of the imaging weights if available (Briggs or uniform), empty otherwise
-   "frequency"       %% scalar; observation frequency
-   "maxProjBaseline" %% scalar; maximum projected baseline (in units of the wavelength; formally max(sqrt(u.^2+v.^2)))
-   ```
 
-- **Notes:**
-  - An example measurement file ``data_3c353.mat`` is provided in the folder [`$R2D2/data/3c353/`](data/3c353/).
-  - Briggs weights are generated using the [WSClean software](https://wsclean.readthedocs.io/en/latest/) with the Briggs parameter set to `0`.
-  - To extract the data file from Measurement Set Tables (MS), you can use the utility Python script [`$R2D2/ms2mat/ms2mat.py`](ms2mat/ms2mat.py). Full instructions are available in [`$R2D2/ms2mat/ReadMe`](ms2mat/README.md).
+### Data (measurement) file
 
-#### Groundtruth file
-The groundtruth file `$GT_FILE` is in `.fits` format. The file is optional and is used to compute the reconstruction evaluation metrics. An example file `3c353_GTfits.fits` is provided in the folder [`$R2D2/data/3c353/`](data/3c353/).
+The current code takes as input data a measurement file in `.mat` format containing the following fields:
 
-### Usage and example
-The R2D2 algorithm (R2D2/R3D3) can be run using the following command from the terminal, specifying the path to the configuration file in `.yaml` format, an example can be found [here](config/imaging/R2D2.yaml):
-``` Python
-python3 ./src/imager.py --yaml_file ./config/imaging/R2D2.yaml
+```matlab
+  "y"               %% vector; data (Stokes I)
+  "u"               %% vector; u coordinate (in units of the wavelength)
+  "v"               %% vector; v coordinate (in units of the wavelength)
+  "w"               %% vector; w coordinate (in units of the wavelength)
+  "nW"              %% vector; inverse of the noise standard deviation
+  "nWimag"          %% vector; square root of the imaging weights if available (Briggs or uniform), empty otherwise
+  "frequency"       %% scalar; observation frequency
+  "maxProjBaseline" %% scalar; maximum projected baseline (in units of the wavelength; formally  max(sqrt(u**2+v**2)))
 ```
 
-The necessary arguments in the configuration files are listed and explained below. The final reconstructions which consist of the image estimate and associated residual dirty image (i.e., back-projected residual data) are saved in `$RESULTS_DIR`. The intermediate reconstructions (outputs of each iteration) can also be saved by using the `--save_all_outputs` argument.
-``` yaml
-im_dim_x: 512                # (int) Image width. 
-im_dim_y: 512                # (int) Image height. 
-data_file: $DATA_FILE        # (str) Path to the input .mat data file. 
-output_path: $RESULTS_DIR    # (str) Path to the final fits files. 
-super_resolution: 1.5        # (float) Super resolution factor. 
-save_all_outputs: False      # (bool, optional) Save all intermediate outputs, otherwise only final iteration results will be saved. 
-gen_nWimag: True             # (bool, optional) Generate imaging weights from the sampling pattern. 
-weight_type: briggs          # (str) Type of imaging weights.
-weight_robustness: 0         # (float) Briggs weighting robutness parameter.
-weight_gridsize: 2           # (float) Briggs weighting grid oversampling size.
-series: $INCARNATION         # (str) Incarnation of the R2D2 algorithm: "R2D2" or "R3D3". 
-num_iter: $I                 # (int) Number of DNNs in the R2D2/R3D3 series 
-layers: $J                   # (int) Number of network layers in the DNN architecture. Currently acceptable values 1, 3, 6. 
-ckpt_path: $CHECKPOINT_DIR   # (str) Path to the directory of the DNN checkpoints. 
-res_on_gpu: True             # (bool, optional) Compute residual dirty images on GPU to significantly accelerate overall imaging time. 
-operator_type: $OP_TYPE      # (str, optional) NUFFT interpolation: "table" or "sparse_matrix". Default: "table" which is faster, "sparse_matrix" is relatively more accurate.
-gdth_file: $GT_FILE          # (str, optional) Path to the ground truth fits file. 
-target_dynamic_range: $DR    # (float, optional) Target dynamic range for the computation of the logSNR metric when the groundtruth is available. 
-```
 - **Notes:**
-   - The parameter `layers` (`$J`) takes different values depending on the considered incarnation of the R2D2 algorithm.
-     -  R2D2 series: `J=1`.
-     -  R3D3 series: to use the currently trained R3D3 realizations, set `J=3` or `J=6`.
+  - To extract the data file from Measurement Set Tables (MS), you can use the utility Python script `pyxisMs2mat/pyxis_ms2mat.py`. Full instructions are available
+  in the [ReadMe File](pyxisMs2mat/ReadMe.md).
+  - An example measurement file `data_3c353.mat` is provided in the folder `data/3c353/`.
 
-   - To run the first term in the R2D2 (respectively, R3D3) series which corresponds to the end-to-end DNN U-Net (respectively, R2D2-Net) set `num_iter` (`$I`)  to `1`.
-   - The parameter `target_dyanamic_range` (`$DR`) is optional and is used to compute the logSNR metric when the groundtruth image is available.
+### Groundtruth file
 
-   - Examples are provided as bash shell scripts in [`$R2D2/scripts/imager.sh`](scripts/imager.sh).
+The groundtruth file `$GT_FILE` is in `.fits` format. The file is optional, used to compute the reconstruction evaluation metrics.
 
- ## Training
- Detailed instructions on the training will be available soon.
+## Usage and Example
+
+### Imaging / Test stage
+
+The R2D2 algorithm can be run using the following command in the terminal. The final reconstructions which consist of the image estimate and associated residual dirty image are saved 
+in `$RESULTS_DIR`. The intermediate reconstructions can also be saved using the argument `--save_all_outputs`. 
+
+```bash
+python3 ./src/imager.py --config $yaml_file
+```
+
+Configuration file `$yaml_file` is in `.yaml` format. Examples for each of the R2D2 variants can be found in [config/imaging](config/imaging), and is structured as follows:
+
+```yaml
+# i/o
+gdth_file: # (str, optional) Path to the ground truth fits file, used for computaiton of SNR and logSNR metric.
+data_file: # (str) Path to the input .mat data file.
+output_path: # (str) Path to the final image files.
+src_name: # (str, optional) Source name, the output folder will be named as.
+save_all_outputs: # (bool, optional) Save all intermediate outputs, otherwise only final iteration results
+will be saved, default to False.
+
+# measurement operator
+nufft_pkg: # (str) NUFFT package to use, default to 'finufft', 'tkbn' (TorchKbNUFFT) and 'pynufft' are also available
+meas_op_on_gpu: # (bool, optional) Compute residual dirty images on GPU to significantly accelerate overall imaging
+time, default to False.
+super_resolution: # (float) Super resolution factor.
+im_dim_x: # (int) Image width.
+im_dim_y: # (int) Image height.
+
+# algorithm
+num_iter: # (int) Number of DNNs in the R2D2 series
+ckpt_path: # (str) Path to the directory of the DNN checkpoints.
+ckpt_realisations: # (int) Number of realisations of the DNN series, if larger than 1, epistemic uncertainty
+quantification will be computed automatically.
+architecture: # (str, optional) DNN architecture, choose from ['unet', 'uwdsr'], default to 'unet'.
+num_chans: # (int, optional) Number of channels in the DNN architecture, 32 for the pre-trained U-Nets and 64 for
+the pre-trained U-WDSRs, default to 64.
+
+target_dynamic_range: # (float, optional) Target dynamic range for computation of logSNR metric and
+stadnard-over-mean image for epistemic uncertainty quantification, if not specified, the reciprocal of the heuristic 1/sqrt(2L)
+will be used automatically, where L is the spectral norm of the measurement operator.
+```
+
+- **Notes:**
+
+  - All abovementioned arguments can be set through command line arguments, e.g.`--data_file data/3c353/data_3c353.mat`, `--output_path results`, etc. Command line arguments will overwrite the arguments in the configuration file.
+  - Examples to run each R2D2 incarnation are provided as bash shell scripts in [examples](examples), along with their corresponding configuration files in [config/imaging](config/imaging).
+
+### Training
+
+The instructions on training will be available soon.

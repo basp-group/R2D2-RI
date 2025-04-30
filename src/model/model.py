@@ -139,6 +139,7 @@ class Model(L.LightningModule):
     def on_training_epoch_end(self):
         avg_loss = torch.stack([x['loss'] for x in self.train_logs]).mean()
         self.logger.experiment.add_scalar("Training_loss", avg_loss, self.current_epoch)
+        self.train_logs.clear()
 
     def on_validation_epoch_end(self):
         self._visualize(self.val_logs)
