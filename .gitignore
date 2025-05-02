@@ -8,3 +8,5 @@ results/
 *.ipynb
 __pycache__/
 r2d2_env/
+
+!tutorial_r2d2_python_v2.ipynb
