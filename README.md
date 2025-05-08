@@ -1,4 +1,4 @@
-# R2D2 RI V2.0 Algorithm
+# R2D2-RI v2.0 Algorithm
 
 ![language](https://img.shields.io/badge/language-python-orange.svg)
 [![license](https://img.shields.io/badge/license-GPL--3.0-brightgreen.svg)](LICENSE)
