@@ -1,4 +1,4 @@
-# R2D2 Algorithm
+# R2D2 RI V2.0 Algorithm
 
 ![language](https://img.shields.io/badge/language-python-orange.svg)
 [![license](https://img.shields.io/badge/license-GPL--3.0-brightgreen.svg)](LICENSE)
@@ -20,6 +20,7 @@
 ## Description
 
 The R2D2 algorithm takes a hybrid structure between a Plug-and-Play (PnP) algorithm and a learned version of the well-known "Matching Pursuit" algorithm. Its reconstruction is formed as a series of residual images, iteratively estimated as outputs of Deep Neural Networks (DNNs) taking the previous iteration’s image estimate and associated data residual as inputs. R2D2's primary application is to solve large-scale, high-resolution, high-dynamic range inverse problems for RI in radio astronomy, more specifically, 2D planar monochromatic intensity imaging. This repository corresponds to the latest version of the R2D2 algorithm (v2.0). Earlier versions (v1.0, both MATLAB and Python) are available as separate branches.
+R2D2 is part of the [BASPLib]{https://basp-group.github.io/BASPLib/R2D2.html} software suite. Users can find a comprehensive R2D2 [tutorial]{https://basp-group.github.io/BASPLib/tutorial_r2d2_python_v2.html} and [benchmarking webpage]{https://basp-group.github.io/BASPLib/benchmarking.html} where R2D2 is evaluated against state-of-the-art algorithms for RI imaging.
 Please refer to the following papers:
 
 <!-- [arXiv:2403.05452](https://arxiv.org/abs/2403.05452) -->
