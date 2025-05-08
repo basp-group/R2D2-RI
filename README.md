@@ -17,6 +17,8 @@
 The R2D2 algorithm takes a hybrid structure between a Plug-and-Play (PnP) algorithm and a learned version of the well-known Matching Pursuit algorithm. Its reconstruction is formed as a series of residual images, iteratively estimated as outputs of iteration-specific Deep Neural Networks (DNNs), each taking the previous iteration’s image estimate and associated back-projected data residual as inputs.  The R2D2 algorithm comes in two incarnations. The first uses the well-known U-Net architecture for
 its DNNs, and is simply referred to as R2D2. The second uses a more advanced architecture dubbed R2D2-Net, obtained by unrolling the R2D2 algorithm itself. In reference to its nesting structure, this incarnation is referred to as R3D3. The primary application of the R2D2 algorithm is to solve large-scale high-resolution high-dynamic range inverse problems in radio astronomy, more specifically 2D planar monochromatic intensity imaging.
 
+R2D2 is part of the [BASPLib](https://basp-group.github.io/BASPLib/R2D2.html) software suite. Users can find a comprehensive [tutorial](https://basp-group.github.io/BASPLib/tutorial_r2d2_python_v1.html) for R2D2 RI v1.0.
+
 Please refer to the following papers:
 
 >[1] Aghabiglou, A., Chu, C. S., Dabbech, A. & Wiaux, Y., The R2D2 deep neural network series paradigm for fast precision imaging in radio astronomy, ApJS, 273(1):3, 2024, [arXiv:2403.05452](https://arxiv.org/abs/2403.05452) | [DOI:10.3847/1538-4365/ad46f5](https://doi.org/10.3847/1538-4365/ad46f5)
