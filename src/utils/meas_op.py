@@ -20,16 +20,16 @@ def create_meas_op(args: argparse.Namespace, data: dict, os: int = 1, device=tor
     """
     match args.nufft_pkg:
         case "finufft":
-            from lib.ri_measurement_operator.pysrc.measOperator.meas_op_nufft_pytorch_finufft import MeasOpPytorchFinufft
+            from ri_measurement_operator.pysrc.measOperator.meas_op_nufft_pytorch_finufft import MeasOpPytorchFinufft
             Operator = MeasOpPytorchFinufft
         case "tkbn":
-            from lib.ri_measurement_operator.pysrc.measOperator.meas_op_nufft_tkbn import MeasOpTkbNUFFT
+            from ri_measurement_operator.pysrc.measOperator.meas_op_nufft_tkbn import MeasOpTkbNUFFT
             Operator = MeasOpTkbNUFFT
         case "pynufft":
-            from lib.ri_measurement_operator.pysrc.measOperator.meas_op_nufft_pynufft import MeasOpPynufft
+            from ri_measurement_operator.pysrc.measOperator.meas_op_nufft_pynufft import MeasOpPynufft
             Operator = MeasOpPynufft
         case "psf":
-            from lib.ri_measurement_operator.pysrc.measOperator.meas_op_PSF import MeasOpPSF
+            from ri_measurement_operator.pysrc.measOperator.meas_op_PSF import MeasOpPSF
             Operator = MeasOpPSF
 
     img_size = tuple(int(i * os) for i in args.img_size)

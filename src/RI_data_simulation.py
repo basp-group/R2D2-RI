@@ -11,7 +11,7 @@ from astropy.io import fits
 from scipy.io import loadmat, savemat
 from tqdm import tqdm
 
-from lib import gen_imaging_weights
+from ri_measurement_operator.pysrc.utils.gen_imaging_weights import gen_imaging_weights
 from utils import (
     create_meas_op,
     parse_args_ri_data_simulation,

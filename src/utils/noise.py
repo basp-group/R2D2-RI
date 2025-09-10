@@ -130,16 +130,16 @@ def compute_tau_instance(op,
         print('No nWimag found for computing tau.')
     match str(op.__class__.__name__):
         case "MeasOpPytorchFinufft":
-            from lib.ri_measurement_operator.pysrc.measOperator.meas_op_nufft_pytorch_finufft import MeasOpPytorchFinufft
+            from ri_measurement_operator.pysrc.measOperator.meas_op_nufft_pytorch_finufft import MeasOpPytorchFinufft
             Operator = MeasOpPytorchFinufft
         case "MeasOpTkbNUFFT":
-            from lib.ri_measurement_operator.pysrc.measOperator.meas_op_nufft_tkbn import MeasOpTkbNUFFT
+            from ri_measurement_operator.pysrc.measOperator.meas_op_nufft_tkbn import MeasOpTkbNUFFT
             Operator = MeasOpTkbNUFFT
         case "MeasOpPynufft":
-            from lib.ri_measurement_operator.pysrc.measOperator.meas_op_nufft_pynufft import MeasOpPynufft
+            from ri_measurement_operator.pysrc.measOperator.meas_op_nufft_pynufft import MeasOpPynufft
             Operator = MeasOpPynufft
         case "MeasOpPSF":
-            from lib.ri_measurement_operator.pysrc.measOperator.meas_op_PSF import MeasOpPSF
+            from ri_measurement_operator.pysrc.measOperator.meas_op_PSF import MeasOpPSF
             Operator = MeasOpPSF
     meas_op_i = Operator(u=data['u'],
                          v=data['v'],
