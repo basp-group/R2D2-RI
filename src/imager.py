@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from astropy.io import fits
 
-from lib import gen_imaging_weights
+from lib.ri_measurement_operator.pysrc.utils.gen_imaging_weights import gen_imaging_weights
 from optimiser import R2D2
 from utils import load_data_to_tensor, parse_args_imaging, vprint, create_meas_op, snr, to_log
 
