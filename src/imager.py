@@ -11,6 +11,14 @@ from utils import load_data_to_tensor, parse_args_imaging, vprint, create_meas_o
 
 
 if __name__ == "__main__":
+    import sys
+    import pathlib
+
+    sys.modules["pathlib._local"] = pathlib 
+    if os.name == 'nt':
+        pathlib.PosixPath = pathlib.WindowsPath
+    else:
+        pathlib.WindowsPath = pathlib.PosixPath
     parser = argparse.ArgumentParser(description="R2D2 image reconstruction.")
     args = parse_args_imaging()
     data = load_data_to_tensor(
@@ -33,21 +41,22 @@ if __name__ == "__main__":
             weight_robustness = args.weight_robustness
         vprint(f"INFO: weight robustness: {weight_robustness}", args.verbose)
     else:
-        weight_robustness = None
-    vprint(f"INFO: computing imaging weights ...", args.verbose)
-    data["nWimag"] = (
-        gen_imaging_weights(
-            data["u"].clone(),
-            data["v"].clone(),
-            data["nW"],
-            args.img_size,
-            args.weight_type,
-            args.weight_gridsize,
-            torch.tensor(weight_robustness).to(args.device),
-        )
-        .to(args.device)
-        .view(1, 1, -1)
-    ).to(torch.complex128 if args.meas_dtype == torch.float64 else torch.complex64)
+        weight_robustness = 0.
+    if args.weight_type in ["uniform", "briggs"]:
+        vprint(f"INFO: computing imaging weights ...", args.verbose)
+        data["nWimag"] = (
+            gen_imaging_weights(
+                data["u"].clone(),
+                data["v"].clone(),
+                data["nW"],
+                args.img_size,
+                args.weight_type,
+                args.weight_gridsize,
+                torch.tensor(weight_robustness).to(args.device),
+            )
+            .to(args.device)
+            .view(1, 1, -1)
+        ).to(torch.complex128 if args.meas_dtype == torch.float64 else torch.complex64)
 
     meas_op = create_meas_op(args=args, data=data, device=args.device)
 
